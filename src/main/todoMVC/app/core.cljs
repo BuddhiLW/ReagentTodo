@@ -12,7 +12,7 @@
 ;;    2 {:id 2, :title "Cuidar dos pets (take care of pets)" :done false}})
 
 ;; (def initial-todos-sorted
-;;   (into (sorted-map) initial-todos))
+;;   (into (sored-map) initial-todos))
 
 (defonce todos (r/atom (sorted-map)))
 
@@ -38,6 +38,14 @@
         new-todo {:id id, :title text, :done false}]
     (swap! todos assoc id new-todo)))
 
+(defn toggle-done
+   "Utility which enables toggling boolean state of a task, on the data-map."
+   [id]
+   (swap! todos update-in [id :done] not))
+
+(defn save-todo [id title]
+  (swap! todos assoc-in [id :title] title))
+
 (defn delete-todo [id]
   (swap! todos dissoc id))
 
@@ -52,12 +60,13 @@
 
 (defn todo-input
   "todo-input component inside task-entry component"
-  []
+  [{:keys [on-save]}]
   (let [input-text (r/atom "")
         update-text #(reset! input-text %)
         stop #(reset! input-text "")
         save #(let [trimmed-text (-> @input-text str str/trim)]
-                (if-not (empty? trimmed-text) (add-todo trimmed-text))
+                (if-not (empty? trimmed-text)
+                  (on-save trimmed-text))
                 (stop))
         key-pressed #(case %
                        "Enter" (save)
@@ -65,20 +74,33 @@
                        "Ecape" (stop)
                        nil)]
     
-    (fn [] ;; => form-two reagent component
-      [:input {:class "new-todo"
-               :placeholder "Todo input"
+    (fn [{:keys [class placeholder]}] ;; => form-two reagent component
+      [:input {:class class
+               :placeholder placeholder
                :type "text"
                :value @input-text
                :on-blur save
                :on-change #(update-text (.. % -target -value))
                :on-key-down #(key-pressed (.. % -key))}])))
 
-(defn todo-item [{:keys [id title]}]
-  [:li
+(defn todo-item [_propos-map] ;; Destructuring, based on actions.
+  (let [editing (r/atom false)]
+    (fn [{:keys [id title done]}]
+      [:li {:class (str (when done "completed ")
+                        (when @editing "editing"))}
    [:div.view
-    [:label title]
-    [:button.destroy {:on-click #(delete-todo id)}]]])
+    [:input {:class "toggle"
+             :type "checkbox"
+             :checked done
+             :on-change #(toggle-done id)}]
+    [:label {:on-double-click #(reset! editing true)} title]
+    [:button.destroy {:on-click #(delete-todo id)}]]
+   (when @editing
+     [todo-input {:class "edit"
+                  :title title
+                  :on-save (fn [text] (save-todo id text))
+                  :on-stop #(reset! editing false)
+                  }])])))
 
 (defn task-list []
   "Tasks TODO section component"
@@ -99,7 +121,9 @@
   []
   [:header.header
    [:h1 "todos"]
-   [todo-input]])
+   [todo-input {:class "new-todo"
+                :placeholder "What needs to be done?"
+                :on-save add-todo}]])
 
 (defn todo []
   [:div
