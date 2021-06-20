@@ -60,10 +60,11 @@
 
 (defn todo-input
   "todo-input component inside task-entry component"
-  [{:keys [on-save]}]
-  (let [input-text (r/atom "")
+  [{:keys [title on-save on-stop]}]
+  (let [input-text (r/atom title)
         update-text #(reset! input-text %)
-        stop #(reset! input-text "")
+        stop #(do (reset! input-text "")
+                  (when on-stop (on-stop)))
         save #(let [trimmed-text (-> @input-text str str/trim)]
                 (if-not (empty? trimmed-text)
                   (on-save trimmed-text))
@@ -134,7 +135,7 @@
        [task-list]
        [footer-controls]])]
    [:footer.info
-    [:p "footer info"]]])
+    [:p "Double-click to edit a todo"]]])
 
 (defn render []
   (rdom/render [todo] (.getElementById js/document "root")))
